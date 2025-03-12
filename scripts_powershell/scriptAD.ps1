@@ -69,40 +69,40 @@ foreach ($usuarioinativo in $usuariosInativos) {  # Percorre a lista de usuário
 }
 
 # Parte 3 - Desabilitação de contas com base em lista do RH
-# Define o caminho do arquivo TXT contendo os usuários desligados
-$arquivoUsuarios = "C:\Users\Administrator\Documents\usuarios_desligados.txt"
+# Importa a lista de usuários desligados do CSV
+$listaUsuarios = Import-Csv "C:\Users\Administrator\Documents\usuarios_desligados.csv" -Encoding utf8
 
 # Define o caminho do log e cria o arquivo se não existir
 $logPath = "C:\Users\Administrator\Documents\Log_Desativacao.txt"
-if (!(Test-Path $logPath)) { New-Item -Path $logPath -ItemType File -Force }  # Cria o arquivo de log se ele não existir
+if (!(Test-Path $logPath)) { New-Item -Path $logPath -ItemType File -Force }
 
-# Verifica se o arquivo de usuários desligados existe
-if (Test-Path $arquivoUsuarios) {  # Se o arquivo existir
-    $listaUsuarios = Get-Content $arquivoUsuarios  # Lê todas as linhas do arquivo TXT
+foreach ($linha in $listaUsuarios) {
+    # Verifica se a coluna usuario_desligado existe e se o valor não está vazio
+    if ($linha.PSObject.Properties.Name -contains "usuario_desligado" -and $linha.usuario_desligado) {
+        $usuariodis = $linha.usuario_desligado.Trim()  # Remove espaços extras
 
-    foreach ($linha in $listaUsuarios) {  # Percorre cada linha do arquivo
-        $usuariodis = $linha.Trim()  # Remove espaços extras
-
-        # Verifica se a linha não está vazia
+        # Verifica se o usuário não está vazio após a limpeza
         if (![string]::IsNullOrWhiteSpace($usuariodis)) {
-            $usuarioAD = Get-ADUser -Filter {SamAccountName -eq $usuariodis} -Properties Enabled  # Busca o usuário no AD
+            # Procura o usuário no Active Directory
+            $usuarioAD = Get-ADUser -Filter {SamAccountName -eq $usuariodis} -Properties Enabled
 
-            if ($usuarioAD) {  # Se o usuário existir no AD
-                if ($usuarioAD.Enabled) {  # Se o usuário estiver ativo
-                    Disable-ADAccount -Identity $usuariodis  # Desativa a conta do usuário
-                    Add-Content -Path $logPath -Value "Usuario desativado: $usuariodis"  # Registra a ação no log
-                    Write-Host "Usuario $usuariodis desativado."  # Exibe mensagem de confirmação
+            if ($usuarioAD) {
+                if ($usuarioAD.Enabled) {
+                    Disable-ADAccount -Identity $usuariodis
+                    Add-Content -Path $logPath -Value "Usuário desativado: $usuariodis"
+                    Write-Host "Usuário $usuariodis desativado."
                 } else {
-                    Write-Host "Usuario $usuariodis já está desativado."  # Informa que o usuário já estava desativado
+                    Write-Host "Usuário $usuariodis já está desativado."
                 }
             } else {
-                Add-Content -Path $logPath -Value "Usuario não encontrado: $usuariodis"  # Registra no log se o usuário não for encontrado
-                Write-Host "Usuario $usuariodis não encontrado no AD."  # Exibe mensagem no console
+                Add-Content -Path $logPath -Value "Usuário não encontrado: $usuariodis"
+                Write-Host "Usuário $usuariodis não encontrado no AD."
             }
         } else {
-            Write-Host "Linha inválida no TXT (usuário vazio)."  # Mensagem de erro para linha vazia no TXT
+            Write-Host "Linha inválida no CSV (usuário vazio)."
         }
+    } else {
+        Write-Host "Erro: Coluna usuario_desligado não encontrada no CSV ou linha vazia."
+        continue
     }
-} else {
-    Write-Host "Erro: O arquivo $arquivoUsuarios não foi encontrado."  # Exibe erro se o arquivo TXT não existir
 }
